@@ -24,7 +24,7 @@ export default function LoginPage() {
   return (
     <div className="flex min-h-full items-center justify-center bg-paper px-4">
       <div className="w-full max-w-sm rounded-card border border-line bg-paperRaised p-8 shadow-card">
-        <h1 className="mb-1 text-xl font-semibold">ورود به ناوابرد</h1>
+        <h1 className="mb-1 text-xl font-semibold">ورود به نوابرد</h1>
         <p className="mb-6 text-sm text-inkSoft">{step === "phone" ? "شماره موبایل خود را وارد کنید." : `کد ارسال‌شده به ${phone} را وارد کنید.`}</p>
         {step === "phone" ? (
           <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); run(async () => { await requestOtp(phone); setStep("otp"); }); }}>
