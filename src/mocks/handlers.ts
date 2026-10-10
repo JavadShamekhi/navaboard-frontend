@@ -1,5 +1,5 @@
 import { http, HttpResponse } from "msw";
-import { boardWithLists, currentUser, db, moveCard, nextId } from "./db";
+import { boardWithLists, currentUser, db, directory, moveCard, nextId, normalizePhone } from "./db";
 
 const DEV_OTP = "123456";
 let mockPassword = "dev12345"; // mock account password
@@ -7,6 +7,9 @@ let lastOtpPhone: string | null = null;
 const now = () => new Date().toISOString();
 const notFound = () => HttpResponse.json({ detail: "یافت نشد" }, { status: 404 });
 const empty = () => new HttpResponse(null, { status: 204 });
+// The real API returns no role field: permissions follow the caller membership.
+const myRole = (wsId: string) => db.workspaceMembers[wsId]?.find((m) => m.user.id === currentUser.id)?.role;
+const forbidden = () => HttpResponse.json({ detail: "شما اجازه‌ی این کار را ندارید." }, { status: 403 });
 
 export const handlers = [
   // auth
@@ -80,14 +83,78 @@ export const handlers = [
   http.get("/api/workspaces/", () => HttpResponse.json(db.workspaces)),
   http.post("/api/workspaces/", async ({ request }) => {
     const { name } = (await request.json()) as { name: string };
-    const ws = { id: nextId(), name, role_user_current: "owner" as const, created_at: now() };
+    const ws = { id: nextId(), name, created_at: now() };
     db.workspaces.push(ws);
+    db.workspaceMembers[ws.id] = [{ id: nextId(), user: currentUser, role: "owner" }];
     return HttpResponse.json(ws, { status: 201 });
+  }),
+  http.get("/api/workspaces/:id/", ({ params }) => {
+    const ws = db.workspaces.find((w) => w.id === params.id);
+    return ws ? HttpResponse.json(ws) : notFound();
+  }),
+  http.patch("/api/workspaces/:id/", async ({ params, request }) => {
+    const ws = db.workspaces.find((w) => w.id === params.id);
+    if (!ws) return notFound();
+    if (myRole(ws.id) === "member") return forbidden();
+    Object.assign(ws, await request.json());
+    return HttpResponse.json(ws);
+  }),
+  http.delete("/api/workspaces/:id/", ({ params }) => {
+    const ws = db.workspaces.find((w) => w.id === params.id);
+    if (!ws) return notFound();
+    if (myRole(ws.id) !== "owner") return forbidden();
+    db.workspaces.splice(db.workspaces.indexOf(ws), 1);
+    db.boards = db.boards.filter((b) => b.workspace_id !== ws.id);
+    delete db.workspaceMembers[ws.id];
+    return empty();
+  }),
+  http.get("/api/workspaces/:id/members/", ({ params }) => HttpResponse.json(db.workspaceMembers[params.id as string] ?? [])),
+  http.post("/api/workspaces/:id/members/", async ({ params, request }) => {
+    const ws = db.workspaces.find((w) => w.id === params.id);
+    if (!ws) return notFound();
+    if (myRole(ws.id) === "member") return forbidden();
+    const { phone_number, role } = (await request.json()) as { phone_number: string; role: "admin" | "member" };
+    const user = directory.find((u) => normalizePhone(u.phone_number) === normalizePhone(phone_number));
+    if (!user) return HttpResponse.json({ phone_number: ["کاربری با این شماره در ناوابرد حساب ندارد."] }, { status: 400 });
+    const list = (db.workspaceMembers[ws.id] ??= []);
+    if (list.some((m) => m.user.id === user.id)) return HttpResponse.json({ detail: "این کاربر قبلاً عضو است." }, { status: 400 });
+    const m = { id: nextId(), user, role };
+    list.push(m);
+    return HttpResponse.json(m, { status: 201 });
+  }),
+  http.patch("/api/workspaces/:id/members/:mid/", async ({ params, request }) => {
+    const ws = db.workspaces.find((w) => w.id === params.id);
+    if (myRole(params.id as string) !== "owner") return forbidden(); // only the owner changes roles
+    const m = db.workspaceMembers[params.id as string]?.find((x) => x.id === params.mid);
+    if (!m) return notFound();
+    const { role } = (await request.json()) as { role: "admin" | "member" };
+    if (m.role === "owner") return HttpResponse.json({ detail: "نقش مالک فقط با انتقال مالکیت تغییر می‌کند." }, { status: 400 });
+    m.role = role;
+    return HttpResponse.json(m);
+  }),
+  http.delete("/api/workspaces/:id/members/:mid/", ({ params }) => {
+    const list = db.workspaceMembers[params.id as string] ?? [];
+    const m = list.find((x) => x.id === params.mid);
+    if (!m) return notFound();
+    if (m.role === "owner") return HttpResponse.json({ detail: "مالک باید قبل از خروج، مالکیت را منتقل کند." }, { status: 400 });
+    list.splice(list.indexOf(m), 1);
+    return empty();
+  }),
+  http.post("/api/workspaces/:id/transfer-ownership/", async ({ params, request }) => {
+    const ws = db.workspaces.find((w) => w.id === params.id);
+    if (!ws || myRole(ws.id) !== "owner") return forbidden();
+    const { new_owner_phone_number } = (await request.json()) as { new_owner_phone_number: string };
+    const list = db.workspaceMembers[ws.id] ?? [];
+    const target = list.find((m) => normalizePhone(m.user.phone_number) === normalizePhone(new_owner_phone_number));
+    if (!target) return HttpResponse.json({ new_owner_phone_number: ["مالک جدید باید عضو این فضای کاری باشد."] }, { status: 400 });
+    list.forEach((m) => { if (m.role === "owner") m.role = "admin"; });
+    target.role = "owner";
+    return empty();
   }),
   http.get("/api/workspaces/:id/boards/", ({ params }) => HttpResponse.json(db.boards.filter((b) => b.workspace_id === params.id))),
   http.post("/api/workspaces/:id/boards/", async ({ params, request }) => {
     const body = (await request.json()) as { name: string; visibility: "private" | "workspace" };
-    const board = { id: nextId(), workspace_id: params.id as string, name: body.name, visibility: body.visibility, role_user_current: "admin" as const, created_at: now() };
+    const board = { id: nextId(), workspace_id: params.id as string, name: body.name, visibility: body.visibility, created_at: now() };
     db.boards.push(board);
     return HttpResponse.json(board, { status: 201 });
   }),

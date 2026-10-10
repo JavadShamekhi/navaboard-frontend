@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useParams } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { DndContext, DragOverlay, PointerSensor, closestCorners, useSensor, useSensors, type DragEndEvent, type DragStartEvent } from "@dnd-kit/core";
 import { boardsApi } from "@/api/boards";
@@ -79,6 +79,7 @@ export default function BoardPage() {
 
   return (
     <div className="px-6 py-6">
+      <Link to={`/workspaces/${board.workspace_id}`} className="text-sm text-inkSoft hover:underline">فضای کاری</Link>
       <h1 className="mb-4 text-xl font-semibold">{board.name}</h1>
       {moveError && <p className="mb-3 rounded-chip bg-rose-soft px-3 py-2 text-sm text-rose">جابه‌جایی انجام نشد: {moveError}</p>}
       <DndContext sensors={sensors} collisionDetection={closestCorners} onDragStart={onDragStart} onDragEnd={onDragEnd}>

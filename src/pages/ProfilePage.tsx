@@ -2,41 +2,9 @@ import { useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { profileApi } from "@/api/profile";
 import { useAuthStore } from "@/store/auth";
-import { describeError } from "@/lib/errors";
 import { useEndSession } from "@/lib/session";
 import Avatar from "@/components/Avatar";
-
-const inputCls = "w-full rounded-chip border border-line px-3 py-2 text-sm outline-none focus:border-teal";
-const ltrInput = inputCls + " text-left";
-const btnCls = "shrink-0 whitespace-nowrap rounded-chip bg-ink px-4 py-2 text-sm text-white disabled:opacity-50";
-
-function Section({ title, hint, children }: { title: string; hint?: string; children: React.ReactNode }) {
-  return (
-    <section className="rounded-card border border-line bg-paperRaised p-5 shadow-card">
-      <h2 className="font-medium">{title}</h2>
-      {hint && <p className="mb-3 mt-1 text-sm text-inkSoft">{hint}</p>}
-      <div className="mt-3 space-y-3">{children}</div>
-    </section>
-  );
-}
-
-/** Runs an async action with shared pending / error / success state. */
-function useAction() {
-  const [pending, setPending] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [ok, setOk] = useState<string | null>(null);
-  async function run(fn: () => Promise<void>, success?: string) {
-    setPending(true); setError(null); setOk(null);
-    try { await fn(); if (success) setOk(success); } catch (e) { setError(describeError(e)); } finally { setPending(false); }
-  }
-  return { pending, error, ok, run, reset: () => { setError(null); setOk(null); } };
-}
-
-function Status({ error, ok }: { error: string | null; ok: string | null }) {
-  if (error) return <p className="text-sm text-rose">{error}</p>;
-  if (ok) return <p className="text-sm text-teal">{ok}</p>;
-  return null;
-}
+import { Section, Status, btnCls, inputCls, ltrInput, useAction } from "@/components/ui";
 
 function NameForm() {
   const user = useAuthStore((s) => s.user)!;

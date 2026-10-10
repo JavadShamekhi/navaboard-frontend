@@ -1,4 +1,4 @@
-import type { Board, Card, Checklist, Comment, Label, List, User, Workspace } from "@/types";
+import type { Board, Card, Checklist, Comment, Label, List, User, Workspace, WorkspaceMember } from "@/types";
 
 let idCounter = 1000;
 export const nextId = () => `mock-${idCounter++}`;
@@ -6,14 +6,19 @@ const now = () => new Date().toISOString();
 
 export const currentUser: User = { id: "user-1", phone_number: "09121234567", full_name: "جواد شامخی", email: null, is_phone_verified: true };
 
+const mkUser = (id: string, phone: string, name: string): User => ({ id, phone_number: phone, full_name: name, email: null, is_phone_verified: true });
+/** Accounts that exist in the mock backend: only these phone numbers can be added as members. */
+export const directory: User[] = [currentUser, mkUser("user-2", "+989351112233", "علی احمدی"), mkUser("user-3", "+989129998877", "مریم کریمی")];
+export const normalizePhone = (p: string) => (p.trim().startsWith("0") ? "+98" + p.trim().slice(1) : p.trim());
+
 const mkCard = (id: string, list_id: string, title: string, position: number): Card => ({
   id, list_id, title, description: null, position, due_at: null, creator: currentUser,
   created_at: now(), updated_at: now(), labels: [], assignees: [], checklists: [],
 });
 
 export const db = {
-  workspaces: [{ id: "ws-1", name: "تیم محصول", role_user_current: "owner", created_at: now() }] as Workspace[],
-  boards: [{ id: "board-1", workspace_id: "ws-1", name: "اسپرینت جاری", visibility: "private", role_user_current: "admin", created_at: now() }] as Board[],
+  workspaces: [{ id: "ws-1", name: "تیم محصول", created_at: now() }] as Workspace[],
+  boards: [{ id: "board-1", workspace_id: "ws-1", name: "اسپرینت جاری", visibility: "private", created_at: now() }] as Board[],
   lists: [
     { id: "list-1", board_id: "board-1", title: "برای انجام", position: 0 },
     { id: "list-2", board_id: "board-1", title: "در حال انجام", position: 1 },
@@ -28,6 +33,13 @@ export const db = {
     mkCard("card-2", "list-1", "طراحی صفحه برد Kanban", 1),
     mkCard("card-3", "list-2", "اتصال drag-and-drop به move endpoint", 0),
   ] as Card[],
+  // workspace id -> memberships (membership id is NOT the user id)
+  workspaceMembers: {
+    "ws-1": [
+      { id: "m-1", user: currentUser, role: "owner" },
+      { id: "m-2", user: directory[1], role: "member" },
+    ],
+  } as Record<string, WorkspaceMember[]>,
   comments: [] as Comment[],
   checklists: [] as Checklist[],
 };
