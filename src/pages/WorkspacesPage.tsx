@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { workspacesApi } from "@/api/workspaces";
+import { boardsApi } from "@/api/boards";
 import type { Workspace } from "@/types";
 import { describeError } from "@/lib/errors";
 
@@ -47,22 +48,21 @@ export default function WorkspacesPage() {
 }
 
 function WorkspaceSection({ workspace }: { workspace: Workspace }) {
-  const queryClient = useQueryClient();
-  const { data: boards } = useQuery({ queryKey: ["boards", workspace.id], queryFn: () => workspacesApi.boards(workspace.id) });
+  const { data: boards } = useQuery({ queryKey: ["boards", workspace.id], queryFn: () => boardsApi.inWorkspace(workspace.id) });
   return (
     <section>
-      <h2 className="mb-3 text-sm font-medium text-inkSoft">{workspace.name}</h2>
+      <div className="mb-3 flex items-center gap-3">
+        <h2 className="text-sm font-medium text-inkSoft">{workspace.name}</h2>
+        <Link to={`/workspaces/${workspace.id}`} className="ms-auto text-sm text-teal hover:underline">مدیریت اعضا و تنظیمات</Link>
+      </div>
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+        {boards?.length === 0 && <p className="col-span-full text-sm text-inkSoft">هنوز بردی نیست؛ از صفحه‌ی مدیریت یک برد بسازید.</p>}
         {boards?.map((b) => (
           <Link key={b.id} to={`/boards/${b.id}`} className="rounded-card border border-line bg-paperRaised p-4 shadow-card hover:border-teal">
             <p className="font-medium">{b.name}</p>
             <p className="mt-1 text-xs text-inkSoft">{b.visibility === "private" ? "خصوصی" : "قابل‌مشاهده برای فضای کاری"}</p>
           </Link>
         ))}
-        <InlineCreate placeholder="برد جدید" onCreate={async (n) => {
-          await workspacesApi.createBoard(workspace.id, n, "private");
-          queryClient.invalidateQueries({ queryKey: ["boards", workspace.id] });
-        }} />
       </div>
     </section>
   );
