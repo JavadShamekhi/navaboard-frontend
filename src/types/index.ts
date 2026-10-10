@@ -4,7 +4,7 @@ export type WorkspaceRole = "owner" | "admin" | "member";
 export type BoardRole = "admin" | "member";
 export type BoardVisibility = "private" | "workspace";
 
-export interface User { id: UUID; phone_number: string; full_name: string | null; email: string | null }
+export interface User { id: UUID; phone_number: string; full_name: string | null; email: string | null; is_phone_verified: boolean }
 export interface Workspace { id: UUID; name: string; role_user_current?: WorkspaceRole; created_at: string }
 export interface WorkspaceMember { id: UUID; user: User; role: WorkspaceRole } // id = membership id, not user id
 export interface Board {

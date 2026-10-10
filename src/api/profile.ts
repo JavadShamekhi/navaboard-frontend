@@ -11,4 +11,8 @@ export const profileApi = {
   requestPasswordReset: (phone_number: string) => api("auth/password/reset/request/", { method: "POST", body: { phone_number } }),
   confirmPasswordReset: (phone_number: string, code: string, new_password: string) =>
     api("auth/password/reset/confirm/", { method: "POST", body: { phone_number, code, new_password } }),
+  // Optional email + password (enables POST auth/email/login/). Guide: all three use Bearer, no CSRF.
+  requestEmailVerification: (email: string) => api("auth/email/verification/request/", { method: "POST", body: { email } }),
+  confirmEmailVerification: (email: string, code: string) => api("auth/email/verification/confirm/", { method: "POST", body: { email, code } }),
+  setPassword: (password: string) => api("auth/password/set/", { method: "POST", body: { password } }),
 };

@@ -4,7 +4,7 @@ let idCounter = 1000;
 export const nextId = () => `mock-${idCounter++}`;
 const now = () => new Date().toISOString();
 
-export const currentUser: User = { id: "user-1", phone_number: "09121234567", full_name: "جواد شامخی", email: null };
+export const currentUser: User = { id: "user-1", phone_number: "09121234567", full_name: "جواد شامخی", email: null, is_phone_verified: true };
 
 const mkCard = (id: string, list_id: string, title: string, position: number): Card => ({
   id, list_id, title, description: null, position, due_at: null, creator: currentUser,
