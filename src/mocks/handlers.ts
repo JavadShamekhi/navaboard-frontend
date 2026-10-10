@@ -2,6 +2,7 @@ import { http, HttpResponse } from "msw";
 import { boardWithLists, currentUser, db, moveCard, nextId } from "./db";
 
 const DEV_OTP = "123456";
+let mockPassword = "dev12345"; // mock account password
 let lastOtpPhone: string | null = null;
 const now = () => new Date().toISOString();
 const notFound = () => HttpResponse.json({ detail: "یافت نشد" }, { status: 404 });
@@ -19,7 +20,49 @@ export const handlers = [
     const { phone_number, code } = (await request.json()) as { phone_number: string; code: string };
     if (phone_number !== lastOtpPhone || code !== DEV_OTP) return HttpResponse.json({ detail: "کد واردشده نادرست یا منقضی است." }, { status: 400 });
     localStorage.setItem("mock-refresh-cookie", "1"); // stands in for the HttpOnly refresh cookie (mock only)
-    return HttpResponse.json({ access: "mock-access-token", type_token: "Bearer", created_user: false, user: currentUser });
+    return HttpResponse.json({ access: "mock-access-token", token_type: "Bearer", user_created: false, user: currentUser });
+  }),
+  // Mock email login: dev@navaboard.test / dev12345
+  http.post("/api/auth/email/login/", async ({ request }) => {
+    const { email, password } = (await request.json()) as { email: string; password: string };
+    if (email !== (currentUser.email || "dev@navaboard.test") || password !== mockPassword)
+      return HttpResponse.json({ detail: "ایمیل یا رمز عبور نادرست است." }, { status: 400 });
+    localStorage.setItem("mock-refresh-cookie", "1");
+    return HttpResponse.json({ access: "mock-access-token", token_type: "Bearer", user_created: false, user: currentUser });
+  }),
+  // profile: phone change, email verification, passwords (code is always 123456 in the mock)
+  http.post("/api/auth/phone/change/request/", () => HttpResponse.json({ at_expires: new Date(Date.now() + 120_000).toISOString() }, { status: 201 })),
+  http.post("/api/auth/phone/change/confirm/", async ({ request }) => {
+    const { phone_number, code } = (await request.json()) as { phone_number: string; code: string };
+    if (code !== DEV_OTP) return HttpResponse.json({ detail: "کد نادرست یا منقضی است." }, { status: 400 });
+    currentUser.phone_number = phone_number.startsWith("0") ? "+98" + phone_number.slice(1) : phone_number;
+    return HttpResponse.json(currentUser);
+  }),
+  http.post("/api/auth/email/verification/request/", () => HttpResponse.json({ at_expires: new Date(Date.now() + 120_000).toISOString() }, { status: 201 })),
+  http.post("/api/auth/email/verification/confirm/", async ({ request }) => {
+    const { email, code } = (await request.json()) as { email: string; code: string };
+    if (code !== DEV_OTP) return HttpResponse.json({ detail: "کد نادرست یا منقضی است." }, { status: 400 });
+    currentUser.email = email;
+    return HttpResponse.json(currentUser);
+  }),
+  http.post("/api/auth/password/set/", async ({ request }) => {
+    mockPassword = ((await request.json()) as { password: string }).password;
+    localStorage.removeItem("mock-refresh-cookie"); // server invalidates sessions
+    return empty();
+  }),
+  http.post("/api/auth/password/change/", async ({ request }) => {
+    const { current_password, new_password } = (await request.json()) as { current_password: string; new_password: string };
+    if (current_password !== mockPassword) return HttpResponse.json({ current_password: ["رمز فعلی نادرست است."] }, { status: 400 });
+    mockPassword = new_password;
+    localStorage.removeItem("mock-refresh-cookie");
+    return empty();
+  }),
+  http.post("/api/auth/password/reset/request/", () => HttpResponse.json({ at_expires: new Date(Date.now() + 120_000).toISOString() }, { status: 201 })),
+  http.post("/api/auth/password/reset/confirm/", async ({ request }) => {
+    const { code, new_password } = (await request.json()) as { code: string; new_password: string };
+    if (code !== DEV_OTP) return HttpResponse.json({ detail: "کد نادرست یا منقضی است." }, { status: 400 });
+    mockPassword = new_password;
+    return empty();
   }),
   http.post("/api/auth/token/refresh/", () =>
     localStorage.getItem("mock-refresh-cookie")
