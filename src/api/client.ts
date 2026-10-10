@@ -71,14 +71,14 @@ export async function requestOtp(phoneNumber: string) {
   return readResponse(r) as Promise<{ at_expires: string; code_otp_development?: string }>;
 }
 
-export async function verifyOtp(phoneNumber: string, code: string): Promise<User> {
+export async function verifyOtp(phoneNumber: string, code: string): Promise<{ user: User; userCreated: boolean }> {
   const r = await csrfFetch("/auth/otp/verify/", {
     method: "POST", headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ phone_number: phoneNumber, code }),
   });
-  const data = (await readResponse(r)) as { access: string; user: User };
+  const data = (await readResponse(r)) as { access: string; user: User; user_created?: boolean };
   accessToken = data.access;
-  return data.user;
+  return { user: data.user, userCreated: !!data.user_created };
 }
 
 export async function loginWithEmail(email: string, password: string): Promise<User> {
@@ -89,6 +89,11 @@ export async function loginWithEmail(email: string, password: string): Promise<U
   const data = (await readResponse(r)) as { access: string; user: User };
   accessToken = data.access;
   return data.user;
+}
+
+/** Drop the in-memory access token without calling the server (server already invalidated the session). */
+export function clearSession() {
+  accessToken = null;
 }
 
 export async function logout() {
