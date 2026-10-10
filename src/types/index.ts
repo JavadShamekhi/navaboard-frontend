@@ -5,11 +5,11 @@ export type BoardRole = "admin" | "member";
 export type BoardVisibility = "private" | "workspace";
 
 export interface User { id: UUID; phone_number: string; full_name: string | null; email: string | null; is_phone_verified: boolean }
-export interface Workspace { id: UUID; name: string; role_user_current?: WorkspaceRole; created_at: string }
+export interface Workspace { id: UUID; name: string; created_at: string } // the API does not return the caller role; derive it from the members list
 export interface WorkspaceMember { id: UUID; user: User; role: WorkspaceRole } // id = membership id, not user id
 export interface Board {
   id: UUID; workspace_id: UUID; name: string; visibility: BoardVisibility;
-  role_user_current?: BoardRole; lists?: List[]; created_at: string;
+  lists?: List[]; created_at: string;
 }
 export interface BoardMember { id: UUID; user: User; role: BoardRole }
 export interface List { id: UUID; board_id: UUID; title: string; position: number; cards?: Card[] }
