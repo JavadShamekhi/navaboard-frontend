@@ -10,6 +10,8 @@ import InfoSection from "@/components/board-settings/InfoSection";
 import ListsSection from "@/components/board-settings/ListsSection";
 import LabelsSection from "@/components/board-settings/LabelsSection";
 import BoardMembersSection from "@/components/board-settings/BoardMembersSection";
+import ActivityPanel from "@/components/ActivityFeed";
+import { activityApi } from "@/api/notifications";
 import type { Board, User } from "@/types";
 
 export default function BoardSettingsPage() {
@@ -51,6 +53,7 @@ function Settings({ board, me }: { board: Board; me: User }) {
       <ListsSection boardId={board.id} />
       <LabelsSection boardId={board.id} canManage={canManage} />
       <BoardMembersSection board={board} me={me} canManage={canManage} />
+      <Section title="تاریخچه‌ی فعالیت"><ActivityPanel queryKey={["activity", "board", board.id]} load={(p) => activityApi.board(board.id, p)} /></Section>
       {canManage && (
         <Section title="حذف برد" hint="ستون‌ها و کارت‌های این برد از دسترس خارج می‌شوند و بازیابی عمومی وجود ندارد." danger>
           <div className="flex gap-2">
