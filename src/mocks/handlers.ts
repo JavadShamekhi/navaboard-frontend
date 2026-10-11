@@ -9,6 +9,12 @@ const notFound = () => HttpResponse.json({ detail: "یافت نشد" }, { status
 const empty = () => new HttpResponse(null, { status: 204 });
 // The real API returns no role field: permissions follow the caller membership.
 const myRole = (wsId: string) => db.workspaceMembers[wsId]?.find((m) => m.user.id === currentUser.id)?.role;
+const boardRole = (boardId: string) => db.boardMembers[boardId]?.find((m) => m.user.id === currentUser.id)?.role;
+/** Board admin, or the owner of the workspace the board lives in. */
+const canManageBoard = (boardId: string) => {
+  const b = db.boards.find((x) => x.id === boardId);
+  return boardRole(boardId) === "admin" || (!!b && myRole(b.workspace_id) === "owner");
+};
 const forbidden = () => HttpResponse.json({ detail: "شما اجازه‌ی این کار را ندارید." }, { status: 403 });
 
 export const handlers = [
@@ -156,14 +162,117 @@ export const handlers = [
     const body = (await request.json()) as { name: string; visibility: "private" | "workspace" };
     const board = { id: nextId(), workspace_id: params.id as string, name: body.name, visibility: body.visibility, created_at: now() };
     db.boards.push(board);
+    db.boardMembers[board.id] = [{ id: nextId(), user: currentUser, role: "admin" }];
     return HttpResponse.json(board, { status: 201 });
   }),
 
   // boards / lists / cards
   http.get("/api/boards/:id/", ({ params }) => {
     const board = boardWithLists(params.id as string);
-    return board ? HttpResponse.json(board) : notFound();
+    if (!board) return notFound();
+    if (localStorage.getItem("mock-flat-board")) { const { lists: _omit, ...flat } = board; return HttpResponse.json(flat); } // detail without nested lists/cards
+    return HttpResponse.json(board);
   }),
+  http.patch("/api/boards/:id/", async ({ params, request }) => {
+    const board = db.boards.find((b) => b.id === params.id);
+    if (!board) return notFound();
+    if (!canManageBoard(board.id)) return forbidden();
+    Object.assign(board, await request.json());
+    return HttpResponse.json(board);
+  }),
+  http.delete("/api/boards/:id/", ({ params }) => {
+    const board = db.boards.find((b) => b.id === params.id);
+    if (!board) return notFound();
+    if (!canManageBoard(board.id)) return forbidden();
+    const listIds = db.lists.filter((l) => l.board_id === board.id).map((l) => l.id);
+    db.cards = db.cards.filter((c) => !listIds.includes(c.list_id));
+    db.lists = db.lists.filter((l) => l.board_id !== board.id);
+    db.boards.splice(db.boards.indexOf(board), 1);
+    delete db.boardMembers[board.id];
+    return empty();
+  }),
+  http.get("/api/boards/:id/lists/", ({ params }) =>
+    HttpResponse.json(db.lists.filter((l) => l.board_id === params.id).sort((a, b) => a.position - b.position))),
+  http.patch("/api/boards/:id/lists/:listId/", async ({ params, request }) => {
+    const list = db.lists.find((l) => l.id === params.listId);
+    if (!list) return notFound();
+    Object.assign(list, await request.json());
+    return HttpResponse.json(list);
+  }),
+  http.delete("/api/boards/:id/lists/:listId/", ({ params }) => {
+    const list = db.lists.find((l) => l.id === params.listId);
+    if (!list) return notFound();
+    db.cards = db.cards.filter((c) => c.list_id !== list.id);
+    db.lists.splice(db.lists.indexOf(list), 1);
+    db.lists.filter((l) => l.board_id === params.id).sort((a, b) => a.position - b.position).forEach((l, i) => (l.position = i));
+    return empty();
+  }),
+  http.get("/api/boards/:id/lists/:listId/cards/", ({ params }) =>
+    HttpResponse.json(db.cards.filter((c) => c.list_id === params.listId).sort((a, b) => a.position - b.position))),
+
+  // board members (only members of the board's workspace can be added)
+  http.get("/api/boards/:id/members/", ({ params }) => HttpResponse.json(db.boardMembers[params.id as string] ?? [])),
+  http.post("/api/boards/:id/members/", async ({ params, request }) => {
+    const board = db.boards.find((b) => b.id === params.id);
+    if (!board) return notFound();
+    if (!canManageBoard(board.id)) return forbidden();
+    const { phone_number, role } = (await request.json()) as { phone_number: string; role: "admin" | "member" };
+    const user = directory.find((u) => normalizePhone(u.phone_number) === normalizePhone(phone_number));
+    if (!user) return HttpResponse.json({ phone_number: ["کاربری با این شماره در ناوابرد حساب ندارد."] }, { status: 400 });
+    if (!db.workspaceMembers[board.workspace_id]?.some((m) => m.user.id === user.id))
+      return HttpResponse.json({ phone_number: ["این کاربر باید ابتدا عضو فضای کاری باشد."] }, { status: 400 });
+    const list = (db.boardMembers[board.id] ??= []);
+    if (list.some((m) => m.user.id === user.id)) return HttpResponse.json({ detail: "این کاربر قبلاً عضو برد است." }, { status: 400 });
+    const m = { id: nextId(), user, role };
+    list.push(m);
+    return HttpResponse.json(m, { status: 201 });
+  }),
+  http.patch("/api/boards/:id/members/:mid/", async ({ params, request }) => {
+    if (!canManageBoard(params.id as string)) return forbidden();
+    const list = db.boardMembers[params.id as string] ?? [];
+    const m = list.find((x) => x.id === params.mid);
+    if (!m) return notFound();
+    const { role } = (await request.json()) as { role: "admin" | "member" };
+    if (m.role === "admin" && role !== "admin" && list.filter((x) => x.role === "admin").length <= 1)
+      return HttpResponse.json({ detail: "برد باید حداقل یک مدیر داشته باشد." }, { status: 400 });
+    m.role = role;
+    return HttpResponse.json(m);
+  }),
+  http.delete("/api/boards/:id/members/:mid/", ({ params }) => {
+    if (!canManageBoard(params.id as string)) return forbidden();
+    const list = db.boardMembers[params.id as string] ?? [];
+    const m = list.find((x) => x.id === params.mid);
+    if (!m) return notFound();
+    if (m.role === "admin" && list.filter((x) => x.role === "admin").length <= 1)
+      return HttpResponse.json({ detail: "برد باید حداقل یک مدیر داشته باشد." }, { status: 400 });
+    list.splice(list.indexOf(m), 1);
+    return empty();
+  }),
+
+  // board labels
+  http.post("/api/boards/:id/labels/", async ({ params, request }) => {
+    if (!canManageBoard(params.id as string)) return forbidden();
+    const { name, color } = (await request.json()) as { name: string; color: string };
+    if (!/^#[0-9a-fA-F]{6}$/.test(color)) return HttpResponse.json({ color: ["رنگ باید به شکل #RRGGBB باشد."] }, { status: 400 });
+    const label = { id: nextId(), board_id: params.id as string, name, color };
+    db.labels.push(label);
+    return HttpResponse.json(label, { status: 201 });
+  }),
+  http.patch("/api/boards/:id/labels/:labelId/", async ({ params, request }) => {
+    if (!canManageBoard(params.id as string)) return forbidden();
+    const label = db.labels.find((l) => l.id === params.labelId);
+    if (!label) return notFound();
+    Object.assign(label, await request.json());
+    return HttpResponse.json(label);
+  }),
+  http.delete("/api/boards/:id/labels/:labelId/", ({ params }) => {
+    if (!canManageBoard(params.id as string)) return forbidden();
+    const i = db.labels.findIndex((l) => l.id === params.labelId);
+    if (i < 0) return notFound();
+    db.labels.splice(i, 1);
+    return empty();
+  }),
+
   http.post("/api/boards/:id/lists/", async ({ params, request }) => {
     const { title } = (await request.json()) as { title: string };
     const list = { id: nextId(), board_id: params.id as string, title, position: db.lists.filter((l) => l.board_id === params.id).length };
