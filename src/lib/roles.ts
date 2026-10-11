@@ -1,11 +1,12 @@
 import { useQuery } from "@tanstack/react-query";
 import { workspacesApi } from "@/api/workspaces";
-import type { User, WorkspaceMember, WorkspaceRole } from "@/types";
+import { boardsApi } from "@/api/boards";
+import type { BoardMember, BoardRole, User, WorkspaceMember, WorkspaceRole } from "@/types";
 
 export const ROLE_LABEL: Record<WorkspaceRole, string> = { owner: "مالک", admin: "مدیر", member: "عضو" };
 
 /** Membership rows carry the user nested; tolerate a flat shape too until the schema is confirmed. */
-export function memberUser(m: WorkspaceMember): User {
+export function memberUser(m: WorkspaceMember | BoardMember): User {
   return (m as { user?: User }).user ?? (m as unknown as User);
 }
 export const personLabel = (u: User) => u.full_name || u.phone_number;
@@ -22,4 +23,13 @@ export function useMyWorkspaceRole(workspaceId: string, me: User) {
   const q = useQuery({ queryKey: ["workspace-members", workspaceId], queryFn: () => workspacesApi.members(workspaceId) });
   const membership = q.data?.find((m) => isMe(memberUser(m), me));
   return { role: membership?.role as WorkspaceRole | undefined, membership, members: q.data, isLoading: q.isLoading, error: q.error };
+}
+
+export const BOARD_ROLE_LABEL: Record<BoardRole, string> = { admin: "مدیر برد", member: "عضو" };
+
+/** Board role, derived from the board member list the same way as the workspace role (no role field in the API). */
+export function useMyBoardRole(boardId: string, me: User) {
+  const q = useQuery({ queryKey: ["board-members", boardId], queryFn: () => boardsApi.members(boardId) });
+  const membership = q.data?.find((m) => isMe(memberUser(m), me));
+  return { role: membership?.role as BoardRole | undefined, membership, members: q.data, isLoading: q.isLoading, error: q.error };
 }
