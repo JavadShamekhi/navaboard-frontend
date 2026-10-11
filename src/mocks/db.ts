@@ -1,4 +1,4 @@
-import type { Board, Card, Checklist, Comment, Label, List, User, Workspace, WorkspaceMember } from "@/types";
+import type { Board, BoardMember, Card, Checklist, Comment, Label, List, User, Workspace, WorkspaceMember } from "@/types";
 
 let idCounter = 1000;
 export const nextId = () => `mock-${idCounter++}`;
@@ -17,12 +17,18 @@ const mkCard = (id: string, list_id: string, title: string, position: number): C
 });
 
 export const db = {
-  workspaces: [{ id: "ws-1", name: "تیم محصول", created_at: now() }] as Workspace[],
-  boards: [{ id: "board-1", workspace_id: "ws-1", name: "اسپرینت جاری", visibility: "private", created_at: now() }] as Board[],
+  workspaces: [
+    { id: "ws-1", name: "تیم محصول", created_at: now() },
+    { id: "ws-2", name: "تیم دیگر", created_at: now() }, // owned by someone else: exercises the non-owner view
+  ] as Workspace[],
+  boards: [{ id: "board-1", workspace_id: "ws-1", name: "اسپرینت جاری", visibility: "private", created_at: now() },
+    { id: "board-2", workspace_id: "ws-2", name: "برد مشترک", visibility: "workspace", created_at: now() },
+  ] as Board[],
   lists: [
     { id: "list-1", board_id: "board-1", title: "برای انجام", position: 0 },
     { id: "list-2", board_id: "board-1", title: "در حال انجام", position: 1 },
     { id: "list-3", board_id: "board-1", title: "انجام‌شده", position: 2 },
+    { id: "list-4", board_id: "board-2", title: "کارهای مشترک", position: 0 },
   ] as List[],
   labels: [
     { id: "label-1", board_id: "board-1", name: "باگ", color: "#B5495B" },
@@ -32,6 +38,7 @@ export const db = {
     mkCard("card-1", "list-1", "پیاده‌سازی فلوی ورود با OTP", 0),
     mkCard("card-2", "list-1", "طراحی صفحه برد Kanban", 1),
     mkCard("card-3", "list-2", "اتصال drag-and-drop به move endpoint", 0),
+    mkCard("card-4", "list-4", "کارت برد مشترک", 0),
   ] as Card[],
   // workspace id -> memberships (membership id is NOT the user id)
   workspaceMembers: {
@@ -39,7 +46,22 @@ export const db = {
       { id: "m-1", user: currentUser, role: "owner" },
       { id: "m-2", user: directory[1], role: "member" },
     ],
+    "ws-2": [
+      { id: "m-3", user: directory[1], role: "owner" },
+      { id: "m-4", user: currentUser, role: "member" },
+    ],
   } as Record<string, WorkspaceMember[]>,
+  // board id -> board memberships (a separate list from workspace members)
+  boardMembers: {
+    "board-1": [
+      { id: "bm-1", user: currentUser, role: "admin" },
+      { id: "bm-2", user: directory[1], role: "member" },
+    ],
+    "board-2": [
+      { id: "bm-3", user: currentUser, role: "member" },
+      { id: "bm-4", user: directory[1], role: "admin" },
+    ],
+  } as Record<string, BoardMember[]>,
   comments: [] as Comment[],
   checklists: [] as Checklist[],
 };

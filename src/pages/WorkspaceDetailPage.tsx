@@ -47,7 +47,7 @@ function Detail({ ws, me }: { ws: Workspace; me: User }) {
       )}
       <BoardsSection workspaceId={ws.id} />
       <MembersSection workspace={ws} me={me} role={role} />
-      <SettingsSection key={ws.name + role} workspace={ws} me={me} role={role} />
+      <SettingsSection key={role} workspace={ws} me={me} role={role} />
     </div>
   );
 }

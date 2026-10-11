@@ -11,11 +11,12 @@ export default function CardModal({ boardId, cardId, onClose }: { boardId: strin
   const { data: comments } = useQuery({ queryKey: ["comments", cardId], queryFn: () => cardsApi.comments(cardId) });
 
   const [description, setDescription] = useState("");
+  const [title, setTitle] = useState("");
   const [comment, setComment] = useState("");
   const [newChecklist, setNewChecklist] = useState("");
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => { if (card) setDescription(card.description ?? ""); }, [card?.id]);
+  useEffect(() => { if (card) { setDescription(card.description ?? ""); setTitle(card.title); } }, [card?.id]);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
     window.addEventListener("keydown", onKey);
@@ -34,7 +35,10 @@ export default function CardModal({ boardId, cardId, onClose }: { boardId: strin
     <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-ink/40 p-6" onClick={onClose}>
       <div role="dialog" aria-label={card.title} onClick={(e) => e.stopPropagation()} className="mt-10 w-full max-w-2xl rounded-card bg-paperRaised p-6 shadow-raised">
         <div className="mb-4 flex items-start justify-between gap-4">
-          <h2 className="text-lg font-semibold">{card.title}</h2>
+          <input value={title} onChange={(e) => setTitle(e.target.value)} aria-label="عنوان کارت"
+            onBlur={() => title.trim() && title.trim() !== card.title && act(() => boardsApi.updateCard(boardId, cardId, { title: title.trim() }), [board, cardKey])}
+            onKeyDown={(e) => e.key === "Enter" && (e.currentTarget as HTMLInputElement).blur()}
+            className="w-full rounded-chip border border-transparent px-1 text-lg font-semibold outline-none hover:border-line focus:border-teal" />
           <button onClick={onClose} className="text-inkSoft hover:text-ink">بستن</button>
         </div>
         {error && <p className="mb-3 rounded-chip bg-rose-soft px-3 py-2 text-sm text-rose">{error}</p>}
@@ -44,6 +48,17 @@ export default function CardModal({ boardId, cardId, onClose }: { boardId: strin
           <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={3} placeholder="توضیحی برای این کارت بنویسید…"
             onBlur={() => description !== (card.description ?? "") && act(() => boardsApi.updateCard(boardId, cardId, { description }), [board, cardKey])}
             className="w-full resize-none rounded-chip border border-line p-2 text-sm outline-none focus:border-teal" />
+        </section>
+
+        <section className="mb-6">
+          <h3 className="mb-2 text-sm font-medium text-inkSoft">موعد انجام</h3>
+          <div className="flex items-center gap-2">
+            {/* The API wants a timezone-aware value: send ISO with Z; null clears the date. */}
+            <input type="datetime-local" dir="ltr" value={toLocalInput(card.due_at)} aria-label="موعد انجام"
+              onChange={(e) => e.target.value && act(() => boardsApi.updateCard(boardId, cardId, { due_at: new Date(e.target.value).toISOString() }), [board, cardKey])}
+              className="rounded-chip border border-line px-2 py-1.5 text-sm outline-none focus:border-teal" />
+            {card.due_at && <button onClick={() => act(() => boardsApi.updateCard(boardId, cardId, { due_at: null }), [board, cardKey])} className="text-sm text-inkSoft hover:underline">حذف موعد</button>}
+          </div>
         </section>
 
         <section className="mb-6">
@@ -83,7 +98,7 @@ export default function CardModal({ boardId, cardId, onClose }: { boardId: strin
           </form>
         </section>
 
-        <section>
+        <section className="mb-6">
           <h3 className="mb-2 text-sm font-medium text-inkSoft">کامنت‌ها</h3>
           <div className="mb-3 space-y-2">
             {comments?.length === 0 && <p className="text-sm text-inkSoft">هنوز کامنتی نیست.</p>}
@@ -104,7 +119,23 @@ export default function CardModal({ boardId, cardId, onClose }: { boardId: strin
             <button type="submit" className="rounded-chip bg-ink px-3 py-1.5 text-sm text-white">ارسال</button>
           </form>
         </section>
+        <div className="border-t border-line pt-4">
+          <button className="text-sm text-rose hover:underline" onClick={async () => {
+            if (!window.confirm("این کارت حذف شود؟")) return;
+            setError(null);
+            try { await boardsApi.deleteCard(boardId, cardId); qc.invalidateQueries({ queryKey: board }); onClose(); } catch (e) { setError(describeError(e)); }
+          }}>حذف کارت</button>
+        </div>
       </div>
     </div>
   );
+}
+
+/** ISO (UTC) -> value for <input type="datetime-local"> in the user's local time. */
+function toLocalInput(iso: string | null | undefined) {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
