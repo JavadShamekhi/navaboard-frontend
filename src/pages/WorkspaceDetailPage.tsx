@@ -7,6 +7,9 @@ import { ROLE_LABEL, useMyWorkspaceRole } from "@/lib/roles";
 import BoardsSection from "@/components/workspace/BoardsSection";
 import MembersSection from "@/components/workspace/MembersSection";
 import SettingsSection from "@/components/workspace/SettingsSection";
+import ActivityPanel from "@/components/ActivityFeed";
+import { Section } from "@/components/ui";
+import { activityApi } from "@/api/notifications";
 import type { User, Workspace } from "@/types";
 
 export default function WorkspaceDetailPage() {
@@ -47,6 +50,7 @@ function Detail({ ws, me }: { ws: Workspace; me: User }) {
       )}
       <BoardsSection workspaceId={ws.id} />
       <MembersSection workspace={ws} me={me} role={role} />
+      <Section title="تاریخچه‌ی فعالیت"><ActivityPanel queryKey={["activity", "workspace", ws.id]} load={(p) => activityApi.workspace(ws.id, p)} /></Section>
       <SettingsSection key={role} workspace={ws} me={me} role={role} />
     </div>
   );
