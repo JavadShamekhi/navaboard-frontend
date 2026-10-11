@@ -142,7 +142,7 @@ export const handlers = [
     if (myRole(ws.id) === "member") return forbidden();
     const { phone_number, role } = (await request.json()) as { phone_number: string; role: "admin" | "member" };
     const user = directory.find((u) => normalizePhone(u.phone_number) === normalizePhone(phone_number));
-    if (!user) return HttpResponse.json({ phone_number: ["کاربری با این شماره در ناوابرد حساب ندارد."] }, { status: 400 });
+    if (!user) return HttpResponse.json({ phone_number: ["کاربری با این شماره در نوابرد حساب ندارد."] }, { status: 400 });
     const list = (db.workspaceMembers[ws.id] ??= []);
     if (list.some((m) => m.user.id === user.id)) return HttpResponse.json({ detail: "این کاربر قبلاً عضو است." }, { status: 400 });
     const m = { id: nextId(), user, role };
@@ -240,7 +240,7 @@ export const handlers = [
     if (!canManageBoard(board.id)) return forbidden();
     const { phone_number, role } = (await request.json()) as { phone_number: string; role: "admin" | "member" };
     const user = directory.find((u) => normalizePhone(u.phone_number) === normalizePhone(phone_number));
-    if (!user) return HttpResponse.json({ phone_number: ["کاربری با این شماره در ناوابرد حساب ندارد."] }, { status: 400 });
+    if (!user) return HttpResponse.json({ phone_number: ["کاربری با این شماره در نوابرد حساب ندارد."] }, { status: 400 });
     if (!db.workspaceMembers[board.workspace_id]?.some((m) => m.user.id === user.id))
       return HttpResponse.json({ phone_number: ["این کاربر باید ابتدا عضو فضای کاری باشد."] }, { status: 400 });
     const list = (db.boardMembers[board.id] ??= []);
@@ -469,7 +469,7 @@ export const handlers = [
     if (!canManageCard(card.id)) return forbidden();
     const { phone_number } = (await request.json()) as { phone_number: string };
     const user = directory.find((u) => normalizePhone(u.phone_number) === normalizePhone(phone_number));
-    if (!user) return HttpResponse.json({ phone_number: ["کاربری با این شماره در ناوابرد حساب ندارد."] }, { status: 400 });
+    if (!user) return HttpResponse.json({ phone_number: ["کاربری با این شماره در نوابرد حساب ندارد."] }, { status: 400 });
     if (card.assignees?.some((a) => a.user.id === user.id)) return HttpResponse.json({ detail: "این کاربر قبلاً مسئول این کارت است." }, { status: 400 });
     const rec = { id: nextId(), user };
     (card.assignees ??= []).push(rec);

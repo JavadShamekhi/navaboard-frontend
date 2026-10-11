@@ -24,7 +24,7 @@ export default function AppShell() {
   return (
     <div className="flex h-full flex-col">
       <header className="flex items-center justify-between border-b border-line bg-paperRaised px-6 py-3">
-        <Link to="/workspaces" className="text-lg font-semibold tracking-tight">ناوابرد</Link>
+        <Link to="/workspaces" className="text-lg font-semibold tracking-tight">نوابرد</Link>
         <form className="hidden flex-1 justify-center px-6 sm:flex" onSubmit={(e) => { e.preventDefault(); navigate(`/search?q=${encodeURIComponent(quick.trim())}`); setQuick(""); }}>
           <input value={quick} onChange={(e) => setQuick(e.target.value)} placeholder="جست‌وجوی کارت…" aria-label="جست‌وجوی سریع"
             className="w-full max-w-sm rounded-chip border border-line bg-paper px-3 py-1.5 text-sm outline-none focus:border-teal" />
