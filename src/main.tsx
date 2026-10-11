@@ -6,6 +6,8 @@ import "./index.css";
 
 const queryClient = new QueryClient({ defaultOptions: { queries: { retry: 1, staleTime: 10_000 } } });
 
+if (import.meta.env.DEV) (window as unknown as { __qc: QueryClient }).__qc = queryClient; // dev-only handle for debugging
+
 async function enableMocking() {
   if (import.meta.env.VITE_USE_MOCKS !== "true") return;
   const { worker } = await import("./mocks/browser");

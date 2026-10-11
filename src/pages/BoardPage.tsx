@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useParams, useSearchParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { DndContext, DragOverlay, PointerSensor, closestCorners, useSensor, useSensors, type DragEndEvent, type DragStartEvent } from "@dnd-kit/core";
 import { boardsApi } from "@/api/boards";
@@ -43,7 +43,9 @@ export default function BoardPage() {
   const { boardId } = useParams<{ boardId: string }>();
   const queryClient = useQueryClient();
   const [activeCard, setActiveCard] = useState<Card | null>(null);
-  const [openCardId, setOpenCardId] = useState<string | null>(null);
+  const [sp, setSp] = useSearchParams();
+  // ?card=<id> opens that card (used by search results).
+  const [openCardId, setOpenCardId] = useState<string | null>(sp.get("card"));
   const [moveError, setMoveError] = useState<string | null>(null);
   const [newList, setNewList] = useState("");
   const key = ["board", boardId];
@@ -110,7 +112,7 @@ export default function BoardPage() {
         </div>
         <DragOverlay>{activeCard ? <CardItem card={activeCard} onOpen={() => {}} overlay /> : null}</DragOverlay>
       </DndContext>
-      {openCardId && <CardModal boardId={boardId!} cardId={openCardId} onClose={() => setOpenCardId(null)} />}
+      {openCardId && <CardModal boardId={boardId!} cardId={openCardId} onClose={() => { setOpenCardId(null); if (sp.has("card")) { sp.delete("card"); setSp(sp, { replace: true }); } }} />}
     </div>
   );
 }

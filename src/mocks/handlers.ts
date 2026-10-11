@@ -17,6 +17,25 @@ const canManageBoard = (boardId: string) => {
 };
 const boardOfCard = (cardId: string) => db.lists.find((l) => l.id === db.cards.find((c) => c.id === cardId)?.list_id)?.board_id;
 const canManageCard = (cardId: string) => { const b = boardOfCard(cardId); return !!b && canManageBoard(b); };
+const scopeOfBoard = (boardId: string) => ({ board_id: boardId, workspace_id: db.boards.find((b) => b.id === boardId)?.workspace_id });
+/** Newest first; every successful mutation by the current user leaves an event (like the real activity log). */
+const logActivity = (action: string, resource_id: string, scope: { workspace_id?: string; board_id?: string; card_id?: string }) => {
+  db.activity.unshift({ id: nextId(), actor: currentUser, action, resource_id, created_at: now(), ...scope });
+};
+/** The real feeds are paginated: { count, next, previous, results }, default 30 per page, max 100. */
+const paginate = <T,>(rows: T[], url: URL) => {
+  const size = Math.min(Number(url.searchParams.get("page_size")) || 30, 100);
+  const page = Math.max(Number(url.searchParams.get("page")) || 1, 1);
+  const link = (p: number) => { const u = new URL(url); u.searchParams.set("page", String(p)); return u.toString(); };
+  return { count: rows.length, next: page * size < rows.length ? link(page + 1) : null, previous: page > 1 ? link(page - 1) : null, results: rows.slice((page - 1) * size, page * size) };
+};
+// Test helper (dev only): simulate somebody else doing something that notifies the current user.
+if (typeof window !== "undefined") {
+  (window as unknown as { __mockNotify: () => void }).__mockNotify = () => {
+    const activity = { id: nextId(), actor: directory[1], action: "card.commented", resource_id: "card-2", board_id: "board-1", created_at: now() };
+    db.notifications.unshift({ id: nextId(), read_at: null, created_at: now(), activity });
+  };
+}
 const forbidden = () => HttpResponse.json({ detail: "شما اجازه‌ی این کار را ندارید." }, { status: 403 });
 
 export const handlers = [
@@ -123,7 +142,7 @@ export const handlers = [
     if (myRole(ws.id) === "member") return forbidden();
     const { phone_number, role } = (await request.json()) as { phone_number: string; role: "admin" | "member" };
     const user = directory.find((u) => normalizePhone(u.phone_number) === normalizePhone(phone_number));
-    if (!user) return HttpResponse.json({ phone_number: ["کاربری با این شماره در ناوابرد حساب ندارد."] }, { status: 400 });
+    if (!user) return HttpResponse.json({ phone_number: ["کاربری با این شماره در نوابرد حساب ندارد."] }, { status: 400 });
     const list = (db.workspaceMembers[ws.id] ??= []);
     if (list.some((m) => m.user.id === user.id)) return HttpResponse.json({ detail: "این کاربر قبلاً عضو است." }, { status: 400 });
     const m = { id: nextId(), user, role };
@@ -165,6 +184,7 @@ export const handlers = [
     const board = { id: nextId(), workspace_id: params.id as string, name: body.name, visibility: body.visibility, created_at: now() };
     db.boards.push(board);
     db.boardMembers[board.id] = [{ id: nextId(), user: currentUser, role: "admin" }];
+    logActivity("board.created", board.id, { workspace_id: board.workspace_id, board_id: board.id });
     return HttpResponse.json(board, { status: 201 });
   }),
 
@@ -220,7 +240,7 @@ export const handlers = [
     if (!canManageBoard(board.id)) return forbidden();
     const { phone_number, role } = (await request.json()) as { phone_number: string; role: "admin" | "member" };
     const user = directory.find((u) => normalizePhone(u.phone_number) === normalizePhone(phone_number));
-    if (!user) return HttpResponse.json({ phone_number: ["کاربری با این شماره در ناوابرد حساب ندارد."] }, { status: 400 });
+    if (!user) return HttpResponse.json({ phone_number: ["کاربری با این شماره در نوابرد حساب ندارد."] }, { status: 400 });
     if (!db.workspaceMembers[board.workspace_id]?.some((m) => m.user.id === user.id))
       return HttpResponse.json({ phone_number: ["این کاربر باید ابتدا عضو فضای کاری باشد."] }, { status: 400 });
     const list = (db.boardMembers[board.id] ??= []);
@@ -299,6 +319,7 @@ export const handlers = [
       created_at: now(), updated_at: now(), labels: [], assignees: [], checklists: [],
     };
     db.cards.push(card);
+    logActivity("card.created", card.id, { ...scopeOfBoard(params.id as string), card_id: card.id });
     return HttpResponse.json(card, { status: 201 });
   }),
   http.get("/api/boards/:id/cards/:cardId/", ({ params }) => {
@@ -313,12 +334,13 @@ export const handlers = [
   }),
   http.delete("/api/boards/:id/cards/:cardId/", ({ params }) => {
     const i = db.cards.findIndex((c) => c.id === params.cardId);
-    if (i >= 0) db.cards.splice(i, 1);
+    if (i >= 0) { db.cards.splice(i, 1); logActivity("card.deleted", params.cardId as string, { ...scopeOfBoard(params.id as string) }); }
     return empty();
   }),
   http.post("/api/boards/:id/cards/:cardId/move/", async ({ params, request }) => {
     const { destination_list_id, position } = (await request.json()) as { destination_list_id: string; position: number };
     moveCard(params.cardId as string, destination_list_id, position);
+    logActivity("card.moved", params.cardId as string, { ...scopeOfBoard(params.id as string), card_id: params.cardId as string });
     return empty();
   }),
 
@@ -354,6 +376,7 @@ export const handlers = [
     const { body } = (await request.json()) as { body: string };
     const comment = { id: nextId(), card_id: params.cardId as string, author: currentUser, body, created_at: now(), updated_at: now() };
     db.comments.push(comment);
+    logActivity("comment.created", comment.id, { ...scopeOfBoard(boardOfCard(params.cardId as string) ?? ""), card_id: params.cardId as string });
     return HttpResponse.json(comment, { status: 201 });
   }),
 
@@ -446,7 +469,7 @@ export const handlers = [
     if (!canManageCard(card.id)) return forbidden();
     const { phone_number } = (await request.json()) as { phone_number: string };
     const user = directory.find((u) => normalizePhone(u.phone_number) === normalizePhone(phone_number));
-    if (!user) return HttpResponse.json({ phone_number: ["کاربری با این شماره در ناوابرد حساب ندارد."] }, { status: 400 });
+    if (!user) return HttpResponse.json({ phone_number: ["کاربری با این شماره در نوابرد حساب ندارد."] }, { status: 400 });
     if (card.assignees?.some((a) => a.user.id === user.id)) return HttpResponse.json({ detail: "این کاربر قبلاً مسئول این کارت است." }, { status: 400 });
     const rec = { id: nextId(), user };
     (card.assignees ??= []).push(rec);
@@ -485,6 +508,51 @@ export const handlers = [
   }),
 
   // notifications (stub)
-  http.get("/api/notifications/unread-count/", () => HttpResponse.json({ count: 0 })),
-  http.get("/api/notifications/", () => HttpResponse.json({ count: 0, next: null, previous: null, results: [] })),
+  http.get("/api/notifications/unread-count/", () => {
+    if (localStorage.getItem("mock-notif-fail")) return HttpResponse.json({ detail: "خطای سرور" }, { status: 500 }); // exercises the polling backoff
+    return HttpResponse.json({ count: db.notifications.filter((n) => !n.read_at).length });
+  }),
+  http.get("/api/notifications/", ({ request }) => {
+    const url = new URL(request.url);
+    let rows = [...db.notifications].sort((a, b) => b.created_at.localeCompare(a.created_at));
+    if (url.searchParams.get("unread") === "true") rows = rows.filter((n) => !n.read_at);
+    return HttpResponse.json(paginate(rows, url));
+  }),
+  http.post("/api/notifications/read-all/", () => {
+    const unread = db.notifications.filter((n) => !n.read_at);
+    unread.forEach((n) => (n.read_at = now()));
+    return HttpResponse.json({ updated: unread.length });
+  }),
+  http.post("/api/notifications/:id/read/", ({ params }) => {
+    const n = db.notifications.find((x) => x.id === params.id);
+    if (!n) return notFound();
+    n.read_at ??= now();
+    return HttpResponse.json(n);
+  }),
+  http.get("/api/workspaces/:id/activity/", ({ params, request }) => HttpResponse.json(paginate(db.activity.filter((a) => a.workspace_id === params.id), new URL(request.url)))),
+  http.get("/api/boards/:id/activity/", ({ params, request }) => HttpResponse.json(paginate(db.activity.filter((a) => a.board_id === params.id), new URL(request.url)))),
+  http.get("/api/cards/:id/activity/", ({ params, request }) => HttpResponse.json(paginate(db.activity.filter((a) => a.card_id === params.id), new URL(request.url)))),
+
+  // card search: q matches title/description; filters combine; dates must carry a timezone
+  http.get("/api/cards/", ({ request }) => {
+    const url = new URL(request.url);
+    const sp = url.searchParams;
+    const hasTz = (v: string) => /(Z|[+-]\d{2}:?\d{2})$/.test(v);
+    for (const k of ["due_before", "due_after"]) if (sp.get(k) && !hasTz(sp.get(k)!)) return HttpResponse.json({ [k]: ["تاریخ باید منطقه‌ی زمانی داشته باشد."] }, { status: 400 });
+    const q = sp.get("q")?.toLowerCase();
+    const rows = db.cards.filter((c) => {
+      const list = db.lists.find((l) => l.id === c.list_id);
+      const board = db.boards.find((b) => b.id === list?.board_id);
+      if (q && !`${c.title} ${c.description ?? ""}`.toLowerCase().includes(q)) return false;
+      if (sp.get("board_id") && board?.id !== sp.get("board_id")) return false;
+      if (sp.get("workspace_id") && board?.workspace_id !== sp.get("workspace_id")) return false;
+      if (sp.get("assigned_to_me") === "true" && !c.assignees?.some((a) => a.user.id === currentUser.id)) return false;
+      if (sp.get("due_before") && !(c.due_at && c.due_at < new Date(sp.get("due_before")!).toISOString())) return false;
+      if (sp.get("due_after") && !(c.due_at && c.due_at > new Date(sp.get("due_after")!).toISOString())) return false;
+      return true;
+    }).map((c) => ({ ...c, board_id: db.lists.find((l) => l.id === c.list_id)?.board_id }));
+    return HttpResponse.json(paginate(rows, url));
+  }),
+  // board search: this mock deliberately IGNORES `q` (unconfirmed parameter) so the UI's own name filter is exercised
+  http.get("/api/boards/", () => HttpResponse.json(db.boards)),
 ];

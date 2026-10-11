@@ -10,6 +10,8 @@ import AssigneesSection from "./AssigneesSection";
 import ChecklistsSection from "./ChecklistsSection";
 import AttachmentsSection from "./AttachmentsSection";
 import CommentsSection from "./CommentsSection";
+import ActivityPanel from "@/components/ActivityFeed";
+import { activityApi } from "@/api/notifications";
 import type { Board } from "@/types";
 
 export default function CardModal({ boardId, cardId, onClose }: { boardId: string; cardId: string; onClose: () => void }) {
@@ -73,6 +75,8 @@ export default function CardModal({ boardId, cardId, onClose }: { boardId: strin
         <ChecklistsSection cardId={cardId} />
         <AttachmentsSection cardId={cardId} />
         <CommentsSection cardId={cardId} me={me} canManage={canManage} />
+
+        <Block title="تاریخچه‌ی کارت"><ActivityPanel queryKey={["activity", "card", cardId]} load={(p) => activityApi.card(cardId, p)} /></Block>
 
         <div className="border-t border-line pt-4">
           <button className="text-sm text-rose hover:underline" onClick={async () => {

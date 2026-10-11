@@ -22,7 +22,7 @@ export default function MembersSection({ workspace, me, role }: { workspace: Wor
   const canRemove = (m: WorkspaceMember) => m.role !== "owner" && !isMe(memberUser(m), me) && (isOwner || (canManage && m.role === "member"));
 
   return (
-    <Section title="اعضا" hint="عضو جدید باید قبلاً در ناوابرد حساب داشته باشد (با شماره‌ی موبایل).">
+    <Section title="اعضا" hint="عضو جدید باید قبلاً در نوابرد حساب داشته باشد (با شماره‌ی موبایل).">
       {isLoading && <p className="text-sm text-inkSoft">در حال بارگذاری…</p>}
       {error && <p className="text-sm text-rose">{describeError(error)}</p>}
       <ul className="divide-y divide-line">
