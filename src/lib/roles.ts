@@ -33,3 +33,11 @@ export function useMyBoardRole(boardId: string, me: User) {
   const membership = q.data?.find((m) => isMe(memberUser(m), me));
   return { role: membership?.role as BoardRole | undefined, membership, members: q.data, isLoading: q.isLoading, error: q.error };
 }
+
+/** Board admin, or owner of the workspace the board lives in (guide, section 9). Both roles come from member lists. */
+export function useCanManageBoard(boardId: string, workspaceId: string | undefined, me: User) {
+  const { role: boardRole } = useMyBoardRole(boardId, me);
+  const ws = useQuery({ queryKey: ["workspace-members", workspaceId], queryFn: () => workspacesApi.members(workspaceId!), enabled: !!workspaceId });
+  const wsRole = ws.data?.find((m) => isMe(memberUser(m), me))?.role;
+  return { boardRole, canManage: boardRole === "admin" || wsRole === "owner" };
+}

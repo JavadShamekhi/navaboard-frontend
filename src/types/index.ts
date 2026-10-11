@@ -16,8 +16,9 @@ export interface List { id: UUID; board_id: UUID; title: string; position: numbe
 export interface Card {
   id: UUID; list_id: UUID; title: string; description: string | null; position: number;
   due_at: string | null; creator: User; created_at: string; updated_at: string;
-  labels?: Label[]; assignees?: User[]; checklists?: Checklist[];
+  labels?: Label[]; assignees?: CardAssignee[]; checklists?: Checklist[];
 }
+export interface CardAssignee { id: UUID; user: User } // id = assignee record id (used for DELETE), not the user id
 export interface Label { id: UUID; board_id: UUID; name: string; color: string }
 export interface Checklist { id: UUID; card_id: UUID; title: string; position: number; items: ChecklistItem[] }
 export interface ChecklistItem { id: UUID; checklist_id: UUID; title: string; position: number; is_completed: boolean }

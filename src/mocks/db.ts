@@ -1,4 +1,4 @@
-import type { Board, BoardMember, Card, Checklist, Comment, Label, List, User, Workspace, WorkspaceMember } from "@/types";
+import type { Attachment, Board, BoardMember, Card, Checklist, Comment, Label, List, User, Workspace, WorkspaceMember } from "@/types";
 
 let idCounter = 1000;
 export const nextId = () => `mock-${idCounter++}`;
@@ -62,7 +62,13 @@ export const db = {
       { id: "bm-4", user: directory[1], role: "admin" },
     ],
   } as Record<string, BoardMember[]>,
-  comments: [] as Comment[],
+  // seeded: comments written by another user (Ali) so edit/delete permissions can be exercised
+  comments: [
+    { id: "c-1", card_id: "card-1", author: directory[1], body: "نظر علی روی کارت اول", created_at: now(), updated_at: now() },
+    { id: "c-2", card_id: "card-4", author: directory[1], body: "نظر علی روی کارت مشترک", created_at: now(), updated_at: now() },
+  ] as Comment[],
+  attachments: [] as Attachment[],
+  attachmentContent: {} as Record<string, string>, // attachment id -> file text (mock only)
   checklists: [] as Checklist[],
 };
 

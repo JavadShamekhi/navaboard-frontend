@@ -15,6 +15,8 @@ const canManageBoard = (boardId: string) => {
   const b = db.boards.find((x) => x.id === boardId);
   return boardRole(boardId) === "admin" || (!!b && myRole(b.workspace_id) === "owner");
 };
+const boardOfCard = (cardId: string) => db.lists.find((l) => l.id === db.cards.find((c) => c.id === cardId)?.list_id)?.board_id;
+const canManageCard = (cardId: string) => { const b = boardOfCard(cardId); return !!b && canManageBoard(b); };
 const forbidden = () => HttpResponse.json({ detail: "شما اجازه‌ی این کار را ندارید." }, { status: 403 });
 
 export const handlers = [
@@ -353,6 +355,133 @@ export const handlers = [
     const comment = { id: nextId(), card_id: params.cardId as string, author: currentUser, body, created_at: now(), updated_at: now() };
     db.comments.push(comment);
     return HttpResponse.json(comment, { status: 201 });
+  }),
+
+  // --- card permissions: board admin / workspace owner manage assignees; authors or managers edit comments ---
+  // (defined as plain helpers right above the handlers that use them)
+
+  http.patch("/api/comments/:id/", async ({ params, request }) => {
+    const c = db.comments.find((x) => x.id === params.id);
+    if (!c) return notFound();
+    if (c.author.id !== currentUser.id && !canManageCard(c.card_id)) return forbidden();
+    const { body } = (await request.json()) as { body: string };
+    Object.assign(c, { body, updated_at: new Date(Date.now() + 1000).toISOString() });
+    return HttpResponse.json(c);
+  }),
+  http.delete("/api/comments/:id/", ({ params }) => {
+    const i = db.comments.findIndex((x) => x.id === params.id);
+    if (i < 0) return notFound();
+    const c = db.comments[i];
+    if (c.author.id !== currentUser.id && !canManageCard(c.card_id)) return forbidden();
+    db.comments.splice(i, 1);
+    return empty();
+  }),
+
+  http.patch("/api/checklists/:id/", async ({ params, request }) => {
+    const cl = db.checklists.find((x) => x.id === params.id);
+    if (!cl) return notFound();
+    Object.assign(cl, await request.json());
+    return HttpResponse.json(cl);
+  }),
+  http.delete("/api/checklists/:id/", ({ params }) => {
+    const i = db.checklists.findIndex((x) => x.id === params.id);
+    if (i < 0) return notFound();
+    db.checklists.splice(i, 1);
+    return empty();
+  }),
+  http.post("/api/checklists/:id/move/", async ({ params, request }) => {
+    const cl = db.checklists.find((x) => x.id === params.id);
+    if (!cl) return notFound();
+    const { position } = (await request.json()) as { position: number };
+    const sib = db.checklists.filter((x) => x.card_id === cl.card_id).sort((a, b) => a.position - b.position);
+    sib.splice(sib.indexOf(cl), 1);
+    sib.splice(position, 0, cl);
+    sib.forEach((x, i) => (x.position = i));
+    return empty();
+  }),
+  http.post("/api/checklist-items/:id/move/", async ({ params, request }) => {
+    const { position } = (await request.json()) as { position: number };
+    for (const cl of db.checklists) {
+      const it = cl.items.find((x) => x.id === params.id);
+      if (!it) continue;
+      const sib = [...cl.items].sort((a, b) => a.position - b.position);
+      sib.splice(sib.indexOf(it), 1);
+      sib.splice(position, 0, it);
+      sib.forEach((x, i) => (x.position = i));
+      return empty();
+    }
+    return notFound();
+  }),
+  http.delete("/api/checklist-items/:id/", ({ params }) => {
+    for (const cl of db.checklists) {
+      const i = cl.items.findIndex((x) => x.id === params.id);
+      if (i >= 0) { cl.items.splice(i, 1); cl.items.sort((a, b) => a.position - b.position).forEach((x, k) => (x.position = k)); return empty(); }
+    }
+    return notFound();
+  }),
+
+  // card labels: attach / detach (the board detail reads card.labels, so tiles update too)
+  http.post("/api/cards/:cardId/labels/", async ({ params, request }) => {
+    const card = db.cards.find((c) => c.id === params.cardId);
+    if (!card) return notFound();
+    const { label_id } = (await request.json()) as { label_id: string };
+    const label = db.labels.find((l) => l.id === label_id);
+    if (!label) return HttpResponse.json({ label_id: ["برچسب پیدا نشد."] }, { status: 400 });
+    if (card.labels?.some((l) => l.id === label.id)) return HttpResponse.json({ detail: "این برچسب قبلاً متصل شده است." }, { status: 400 });
+    (card.labels ??= []).push(label);
+    return HttpResponse.json(label, { status: 201 });
+  }),
+  http.delete("/api/cards/:cardId/labels/:labelId/", ({ params }) => {
+    const card = db.cards.find((c) => c.id === params.cardId);
+    if (!card) return notFound();
+    card.labels = (card.labels ?? []).filter((l) => l.id !== params.labelId);
+    return empty();
+  }),
+
+  // card assignees: records { id, user }; the id is NOT the user id
+  http.get("/api/cards/:cardId/members/", ({ params }) => HttpResponse.json(db.cards.find((c) => c.id === params.cardId)?.assignees ?? [])),
+  http.post("/api/cards/:cardId/members/", async ({ params, request }) => {
+    const card = db.cards.find((c) => c.id === params.cardId);
+    if (!card) return notFound();
+    if (!canManageCard(card.id)) return forbidden();
+    const { phone_number } = (await request.json()) as { phone_number: string };
+    const user = directory.find((u) => normalizePhone(u.phone_number) === normalizePhone(phone_number));
+    if (!user) return HttpResponse.json({ phone_number: ["کاربری با این شماره در ناوابرد حساب ندارد."] }, { status: 400 });
+    if (card.assignees?.some((a) => a.user.id === user.id)) return HttpResponse.json({ detail: "این کاربر قبلاً مسئول این کارت است." }, { status: 400 });
+    const rec = { id: nextId(), user };
+    (card.assignees ??= []).push(rec);
+    return HttpResponse.json(rec, { status: 201 });
+  }),
+  http.delete("/api/cards/:cardId/members/:assigneeId/", ({ params }) => {
+    const card = db.cards.find((c) => c.id === params.cardId);
+    if (!card) return notFound();
+    if (!canManageCard(card.id)) return forbidden();
+    card.assignees = (card.assignees ?? []).filter((a) => a.id !== params.assigneeId);
+    return empty();
+  }),
+
+  // attachments (multipart upload, blob download)
+  http.get("/api/cards/:cardId/attachments/", ({ params }) => HttpResponse.json(db.attachments.filter((a) => a.card_id === params.cardId))),
+  http.post("/api/cards/:cardId/attachments/", async ({ params, request }) => {
+    const form = await request.formData();
+    const file = form.get("file");
+    if (!(file instanceof File)) return HttpResponse.json({ file: ["فایلی ارسال نشده است."] }, { status: 400 });
+    if (file.size > 10 * 1024 * 1024) return HttpResponse.json({ file: ["حجم فایل از حد مجاز (۱۰ مگابایت) بیشتر است."] }, { status: 400 });
+    const att = { id: nextId(), card_id: params.cardId as string, original_name: file.name, size: file.size, created_at: now() };
+    db.attachments.push(att);
+    db.attachmentContent[att.id] = await file.text();
+    return HttpResponse.json(att, { status: 201 });
+  }),
+  http.get("/api/cards/:cardId/attachments/:attId/content/", ({ params }) => {
+    const att = db.attachments.find((a) => a.id === params.attId);
+    if (!att) return notFound();
+    return new HttpResponse(db.attachmentContent[att.id] ?? "", { headers: { "Content-Type": "application/octet-stream", "Content-Disposition": "attachment" } });
+  }),
+  http.delete("/api/cards/:cardId/attachments/:attId/", ({ params }) => {
+    const i = db.attachments.findIndex((a) => a.id === params.attId);
+    if (i < 0) return notFound();
+    db.attachments.splice(i, 1);
+    return empty();
   }),
 
   // notifications (stub)
