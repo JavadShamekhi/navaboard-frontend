@@ -9,6 +9,8 @@ import BoardPage from "@/pages/BoardPage";
 import ProfilePage from "@/pages/ProfilePage";
 import WorkspaceDetailPage from "@/pages/WorkspaceDetailPage";
 import BoardSettingsPage from "@/pages/BoardSettingsPage";
+import NotificationsPage from "@/pages/NotificationsPage";
+import SearchPage from "@/pages/SearchPage";
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
   const status = useAuthStore((s) => s.status);
@@ -36,6 +38,8 @@ export default function App() {
           <Route path="/boards/:boardId" element={<BoardPage />} />
           <Route path="/boards/:boardId/settings" element={<BoardSettingsPage />} />
           <Route path="/profile" element={<ProfilePage />} />
+          <Route path="/notifications" element={<NotificationsPage />} />
+          <Route path="/search" element={<SearchPage />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
