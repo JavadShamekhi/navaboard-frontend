@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { workspacesApi } from "@/api/workspaces";
@@ -12,6 +12,7 @@ export default function SettingsSection({ workspace, me, role }: { workspace: Wo
   const isOwner = role === "owner";
   const canRename = role === "owner" || role === "admin";
   const [name, setName] = useState(workspace.name);
+  useEffect(() => setName(workspace.name), [workspace.name]);
   const [newOwner, setNewOwner] = useState("");
   const rename = useAction();
   const transfer = useAction();
