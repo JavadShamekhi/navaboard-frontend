@@ -24,7 +24,8 @@ export interface Checklist { id: UUID; card_id: UUID; title: string; position: n
 export interface ChecklistItem { id: UUID; checklist_id: UUID; title: string; position: number; is_completed: boolean }
 export interface Comment { id: UUID; card_id: UUID; author: User; body: string; created_at: string; updated_at: string }
 export interface Attachment { id: UUID; card_id: UUID; original_name: string; size: number; created_at: string }
-export interface NotificationItem { id: UUID; action: string; read_at: string | null; created_at: string; activity: Record<string, unknown> }
-export interface ActivityItem { id: UUID; actor: User; action: string; resource_id: UUID; created_at: string }
+// Exact notification/activity shapes are not confirmed by the schema yet: the helpers in lib/activity.ts read them tolerantly.
+export interface NotificationItem { id: UUID; read_at: string | null; created_at: string; activity?: Partial<ActivityItem> & Record<string, unknown> }
+export interface ActivityItem { id: UUID; actor: User; action: string; resource_id: UUID; resource_type?: string; created_at: string }
 export interface Paginated<T> { count: number; next: string | null; previous: string | null; results: T[] }
 export type ApiErrorBody = { detail: string } | Record<string, string[]> | string[];
