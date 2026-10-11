@@ -5,7 +5,9 @@ import type { Card } from "@/types";
 export default function CardItem({ card, onOpen, overlay }: { card: Card; onOpen: () => void; overlay?: boolean }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: card.id });
   const style = overlay ? undefined : { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.4 : 1 };
-  const hasMeta = !!card.labels?.length || !!card.assignees?.length;
+  const hasMeta = !!card.labels?.length || !!card.assignees?.length || !!card.due_at;
+  const due = card.due_at ? new Date(card.due_at) : null;
+  const overdue = !!due && due.getTime() < Date.now();
 
   return (
     <div
@@ -20,6 +22,7 @@ export default function CardItem({ card, onOpen, overlay }: { card: Card; onOpen
       {hasMeta && (
         <div className="mt-2 flex items-center gap-2">
           {card.labels?.map((l) => <span key={l.id} title={l.name} className="h-2 w-6 rounded-full" style={{ backgroundColor: l.color }} />)}
+          {due && !Number.isNaN(due.getTime()) && <span className={`rounded-full px-2 py-0.5 text-xs ${overdue ? "bg-rose-soft text-rose" : "bg-paper text-inkSoft"}`}>{due.toLocaleDateString("fa-IR")}</span>}
           {!!card.assignees?.length && <span className="ms-auto rounded-full bg-paper px-2 py-0.5 text-xs text-inkSoft">{card.assignees.length} مسئول</span>}
         </div>
       )}
