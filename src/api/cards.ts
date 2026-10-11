@@ -1,5 +1,5 @@
 import { api, apiUpload } from "./client";
-import type { Attachment, Checklist, ChecklistItem, Comment, Label, User } from "@/types";
+import type { Attachment, CardAssignee, Checklist, ChecklistItem, Comment, Label } from "@/types";
 
 export const cardsApi = {
   comments: (id: string) => api<Comment[]>(`cards/${id}/comments/`),
@@ -22,8 +22,8 @@ export const cardsApi = {
   attachLabel: (id: string, label_id: string) => api<void>(`cards/${id}/labels/`, { method: "POST", body: { label_id } }),
   detachLabel: (id: string, labelId: string) => api<void>(`cards/${id}/labels/${labelId}/`, { method: "DELETE" }),
 
-  assignees: (id: string) => api<User[]>(`cards/${id}/members/`),
-  assign: (id: string, phone_number: string) => api<User>(`cards/${id}/members/`, { method: "POST", body: { phone_number } }),
+  assignees: (id: string) => api<CardAssignee[]>(`cards/${id}/members/`),
+  assign: (id: string, phone_number: string) => api<CardAssignee>(`cards/${id}/members/`, { method: "POST", body: { phone_number } }),
   unassign: (id: string, assigneeId: string) => api<void>(`cards/${id}/members/${assigneeId}/`, { method: "DELETE" }),
 
   attachments: (id: string) => api<Attachment[]>(`cards/${id}/attachments/`),
