@@ -1,4 +1,7 @@
-import type { Attachment, Board, BoardMember, Card, Checklist, Comment, Label, List, User, Workspace, WorkspaceMember } from "@/types";
+import type { ActivityItem, Attachment, Board, BoardMember, Card, Checklist, Comment, Label, List, NotificationItem, User, Workspace, WorkspaceMember } from "@/types";
+
+/** An activity event plus the scope ids the three feeds filter on. */
+export type ActivityRec = ActivityItem & { workspace_id?: string; board_id?: string; card_id?: string };
 
 let idCounter = 1000;
 export const nextId = () => `mock-${idCounter++}`;
@@ -67,6 +70,20 @@ export const db = {
     { id: "c-1", card_id: "card-1", author: directory[1], body: "نظر علی روی کارت اول", created_at: now(), updated_at: now() },
     { id: "c-2", card_id: "card-4", author: directory[1], body: "نظر علی روی کارت مشترک", created_at: now(), updated_at: now() },
   ] as Comment[],
+  // 35 events so the default page size (30) produces a second page; newest first.
+  activity: Array.from({ length: 35 }, (_, i): ActivityRec => ({
+    id: `act-${i}`, actor: i % 2 ? currentUser : directory[1], action: i % 3 ? "card.moved" : "comment.created",
+    resource_id: "card-2", created_at: new Date(Date.now() - i * 60_000).toISOString(),
+    workspace_id: "ws-1", board_id: "board-1", card_id: "card-2",
+  })),
+  notifications: [
+    { id: "n-1", read_at: null, created_at: new Date(Date.now() - 60_000).toISOString(),
+      activity: { id: "act-n1", actor: directory[1], action: "card.moved", resource_id: "card-2", board_id: "board-1", created_at: new Date(Date.now() - 60_000).toISOString() } },
+    { id: "n-2", read_at: null, created_at: new Date(Date.now() - 120_000).toISOString(),
+      activity: { id: "act-n2", actor: directory[2], action: "comment.created", resource_id: "card-1", board_id: "board-1", created_at: new Date(Date.now() - 120_000).toISOString() } },
+    { id: "n-3", read_at: new Date().toISOString(), created_at: new Date(Date.now() - 180_000).toISOString(),
+      activity: { id: "act-n3", actor: directory[1], action: "card.assigned", resource_id: "card-3", created_at: new Date(Date.now() - 180_000).toISOString() } },
+  ] as NotificationItem[],
   attachments: [] as Attachment[],
   attachmentContent: {} as Record<string, string>, // attachment id -> file text (mock only)
   checklists: [] as Checklist[],
