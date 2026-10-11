@@ -9,6 +9,22 @@ import CardItem from "@/components/board/CardItem";
 import CardModal from "@/components/card/CardModal";
 import { describeError } from "@/lib/errors";
 
+/**
+ * Board detail normally carries lists and cards. If it does not, fall back to the dedicated endpoints
+ * (GET lists, GET cards of a list) so the UI works with either response shape.
+ */
+async function loadBoard(boardId: string): Promise<Board> {
+  const b = await boardsApi.get(boardId);
+  const rawLists = b.lists ?? (await boardsApi.lists(boardId));
+  const lists = await Promise.all(
+    [...rawLists].sort((x, y) => x.position - y.position).map(async (l) => {
+      const cards = l.cards ?? (await boardsApi.listCards(boardId, l.id));
+      return { ...l, cards: [...cards].sort((x, y) => x.position - y.position) };
+    })
+  );
+  return { ...b, lists };
+}
+
 /** Pure local move used for the optimistic update; mirrors backend semantics (0-based position). */
 function applyMove(board: Board, cardId: string, destListId: string, position: number): Board {
   const lists = (board.lists ?? []).map((l) => ({ ...l, cards: [...(l.cards ?? [])] }));
@@ -32,7 +48,7 @@ export default function BoardPage() {
   const [newList, setNewList] = useState("");
   const key = ["board", boardId];
 
-  const { data: board, isLoading, error } = useQuery({ queryKey: key, queryFn: () => boardsApi.get(boardId!), enabled: !!boardId });
+  const { data: board, isLoading, error } = useQuery({ queryKey: key, queryFn: () => loadBoard(boardId!), enabled: !!boardId });
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
   const allCards = board?.lists?.flatMap((l) => l.cards ?? []) ?? [];
 
@@ -79,7 +95,10 @@ export default function BoardPage() {
 
   return (
     <div className="px-6 py-6">
-      <Link to={`/workspaces/${board.workspace_id}`} className="text-sm text-inkSoft hover:underline">فضای کاری</Link>
+      <div className="flex items-center justify-between">
+        <Link to={`/workspaces/${board.workspace_id}`} className="text-sm text-inkSoft hover:underline">فضای کاری</Link>
+        <Link to={`/boards/${board.id}/settings`} className="text-sm text-teal hover:underline">تنظیمات برد، ستون‌ها و اعضا</Link>
+      </div>
       <h1 className="mb-4 text-xl font-semibold">{board.name}</h1>
       {moveError && <p className="mb-3 rounded-chip bg-rose-soft px-3 py-2 text-sm text-rose">جابه‌جایی انجام نشد: {moveError}</p>}
       <DndContext sensors={sensors} collisionDetection={closestCorners} onDragStart={onDragStart} onDragEnd={onDragEnd}>
