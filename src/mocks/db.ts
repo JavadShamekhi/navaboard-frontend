@@ -110,3 +110,17 @@ export function moveCard(cardId: string, destListId: string, position: number) {
     db.cards.filter((c) => c.list_id === sourceListId).sort((a, b) => a.position - b.position).forEach((c, i) => (c.position = i));
   }
 }
+
+// card-1 carries everything a cross-board copy has to deal with: details, due date, a label, a checklist (one item done) and a comment by someone else.
+{
+  const c = db.cards.find((x) => x.id === "card-1")!;
+  c.description = "اتصال صفحه ورود به OTP";
+  c.due_at = "2026-12-01T09:00:00.000Z";
+  c.labels = [db.labels[0]];
+  db.checklists.push({ id: "cl-seed", card_id: "card-1", title: "مراحل", position: 0, items: [
+    { id: "it-1", checklist_id: "cl-seed", title: "فرم موبایل", position: 0, is_completed: true },
+    { id: "it-2", checklist_id: "cl-seed", title: "فرم کد", position: 1, is_completed: false },
+  ] });
+}
+// a label with the same name on the destination board: it can be matched by name when copying
+db.labels.push({ id: "label-3", board_id: "board-2", name: "باگ", color: "#B5495B" });

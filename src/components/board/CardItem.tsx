@@ -3,7 +3,7 @@ import { CSS } from "@dnd-kit/utilities";
 import type { Card } from "@/types";
 
 export default function CardItem({ card, onOpen, overlay }: { card: Card; onOpen: () => void; overlay?: boolean }) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: card.id });
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: card.id, data: { type: "card" } });
   const style = overlay ? undefined : { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.4 : 1 };
   const hasMeta = !!card.labels?.length || !!card.assignees?.length || !!card.due_at;
   const due = card.due_at ? new Date(card.due_at) : null;

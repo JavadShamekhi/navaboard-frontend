@@ -36,6 +36,11 @@ if (typeof window !== "undefined") {
     db.notifications.unshift({ id: nextId(), read_at: null, created_at: now(), activity });
   };
 }
+/** The API accepts only integer positions inside a range; anything else is a 400 (so UI off-by-one bugs show up in tests). */
+const badPosition = (position: unknown, max: number) =>
+  !Number.isInteger(position) || (position as number) < 0 || (position as number) > max
+    ? HttpResponse.json({ position: [`position باید عددی بین 0 و ${max} باشد.`] }, { status: 400 })
+    : null;
 const forbidden = () => HttpResponse.json({ detail: "شما اجازه‌ی این کار را ندارید." }, { status: 403 });
 
 export const handlers = [
@@ -95,6 +100,7 @@ export const handlers = [
     return empty();
   }),
   http.post("/api/auth/token/refresh/", () =>
+    localStorage.getItem("mock-refresh-fail") ? HttpResponse.json({ detail: "Service Unavailable" }, { status: 503 }) :
     localStorage.getItem("mock-refresh-cookie")
       ? HttpResponse.json({ access: "mock-access-token" })
       : HttpResponse.json({ detail: "Authentication credentials were not provided." }, { status: 401 })
@@ -142,7 +148,7 @@ export const handlers = [
     if (myRole(ws.id) === "member") return forbidden();
     const { phone_number, role } = (await request.json()) as { phone_number: string; role: "admin" | "member" };
     const user = directory.find((u) => normalizePhone(u.phone_number) === normalizePhone(phone_number));
-    if (!user) return HttpResponse.json({ phone_number: ["کاربری با این شماره در نوابرد حساب ندارد."] }, { status: 400 });
+    if (!user) return HttpResponse.json({ phone_number: ["کاربری با این شماره در ناوابرد حساب ندارد."] }, { status: 400 });
     const list = (db.workspaceMembers[ws.id] ??= []);
     if (list.some((m) => m.user.id === user.id)) return HttpResponse.json({ detail: "این کاربر قبلاً عضو است." }, { status: 400 });
     const m = { id: nextId(), user, role };
@@ -240,7 +246,7 @@ export const handlers = [
     if (!canManageBoard(board.id)) return forbidden();
     const { phone_number, role } = (await request.json()) as { phone_number: string; role: "admin" | "member" };
     const user = directory.find((u) => normalizePhone(u.phone_number) === normalizePhone(phone_number));
-    if (!user) return HttpResponse.json({ phone_number: ["کاربری با این شماره در نوابرد حساب ندارد."] }, { status: 400 });
+    if (!user) return HttpResponse.json({ phone_number: ["کاربری با این شماره در ناوابرد حساب ندارد."] }, { status: 400 });
     if (!db.workspaceMembers[board.workspace_id]?.some((m) => m.user.id === user.id))
       return HttpResponse.json({ phone_number: ["این کاربر باید ابتدا عضو فضای کاری باشد."] }, { status: 400 });
     const list = (db.boardMembers[board.id] ??= []);
@@ -306,6 +312,7 @@ export const handlers = [
     const siblings = db.lists.filter((l) => l.board_id === params.id).sort((a, b) => a.position - b.position);
     const list = siblings.find((l) => l.id === params.listId);
     if (!list) return notFound();
+    { const bad = badPosition(position, siblings.length - 1); if (bad) return bad; }
     siblings.splice(siblings.indexOf(list), 1);
     siblings.splice(position, 0, list);
     siblings.forEach((l, i) => (l.position = i));
@@ -339,6 +346,17 @@ export const handlers = [
   }),
   http.post("/api/boards/:id/cards/:cardId/move/", async ({ params, request }) => {
     const { destination_list_id, position } = (await request.json()) as { destination_list_id: string; position: number };
+    const destList = db.lists.find((l) => l.id === destination_list_id);
+    if (!destList) return HttpResponse.json({ destination_list_id: ["ستون مقصد پیدا نشد."] }, { status: 404 });
+    // The guide says a card can only move inside ITS OWN board. Set localStorage "mock-allow-cross-board" to mimic a backend that allows more.
+    if (destList.board_id !== params.id && !localStorage.getItem("mock-allow-cross-board"))
+      return HttpResponse.json({ detail: "ستون مقصد باید در همین برد باشد." }, { status: 400 });
+    { // inside a list: 0..count-1; into another list: 0..destination count (API)
+      const card = db.cards.find((c) => c.id === params.cardId);
+      const destCount = db.cards.filter((c) => c.list_id === destList.id).length;
+      const bad = badPosition(position, card?.list_id === destList.id ? destCount - 1 : destCount);
+      if (bad) return bad;
+    }
     moveCard(params.cardId as string, destination_list_id, position);
     logActivity("card.moved", params.cardId as string, { ...scopeOfBoard(params.id as string), card_id: params.cardId as string });
     return empty();
@@ -417,6 +435,7 @@ export const handlers = [
     if (!cl) return notFound();
     const { position } = (await request.json()) as { position: number };
     const sib = db.checklists.filter((x) => x.card_id === cl.card_id).sort((a, b) => a.position - b.position);
+    { const bad = badPosition(position, sib.length - 1); if (bad) return bad; }
     sib.splice(sib.indexOf(cl), 1);
     sib.splice(position, 0, cl);
     sib.forEach((x, i) => (x.position = i));
@@ -428,6 +447,7 @@ export const handlers = [
       const it = cl.items.find((x) => x.id === params.id);
       if (!it) continue;
       const sib = [...cl.items].sort((a, b) => a.position - b.position);
+      { const bad = badPosition(position, sib.length - 1); if (bad) return bad; }
       sib.splice(sib.indexOf(it), 1);
       sib.splice(position, 0, it);
       sib.forEach((x, i) => (x.position = i));
@@ -469,7 +489,7 @@ export const handlers = [
     if (!canManageCard(card.id)) return forbidden();
     const { phone_number } = (await request.json()) as { phone_number: string };
     const user = directory.find((u) => normalizePhone(u.phone_number) === normalizePhone(phone_number));
-    if (!user) return HttpResponse.json({ phone_number: ["کاربری با این شماره در نوابرد حساب ندارد."] }, { status: 400 });
+    if (!user) return HttpResponse.json({ phone_number: ["کاربری با این شماره در ناوابرد حساب ندارد."] }, { status: 400 });
     if (card.assignees?.some((a) => a.user.id === user.id)) return HttpResponse.json({ detail: "این کاربر قبلاً مسئول این کارت است." }, { status: 400 });
     const rec = { id: nextId(), user };
     (card.assignees ??= []).push(rec);
