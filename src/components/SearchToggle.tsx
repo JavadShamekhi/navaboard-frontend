@@ -120,8 +120,8 @@ export default function SearchToggle() {
 						role="search"
 						className={`flex items-center rounded-full transition duration-300 ${
 								open
-										? "bg-white shadow-[0_8px_24px_-8px_rgba(14,165,233,0.5)]"
-										: "bg-white/40 hover:bg-white hover:shadow-[0_0_18px_rgba(255,255,255,0.95)]"
+										? "bg-white shadow-[0_8px_24px_-8px_rgba(2,132,199,0.6)]"
+										: "bg-white/20 hover:bg-white/30 hover:shadow-[0_0_18px_rgba(255,255,255,0.45)]"
 						}`}
 				>
 					{/* در RTL اولین فرزند سمت راست است، پس فیلد به سمت راست باز می‌شود */}
@@ -143,7 +143,9 @@ export default function SearchToggle() {
 							onClick={toggle}
 							aria-label={open ? "بستن جست‌وجو" : "باز کردن جست‌وجو"}
 							title="جست‌وجو"
-							className="group grid h-9 w-9 shrink-0 place-items-center rounded-full text-sky-900 outline-none transition duration-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 active:scale-95"
+							className={`group grid h-9 w-9 shrink-0 place-items-center rounded-full outline-none transition duration-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-300 active:scale-95 ${
+									open ? "text-sky-700" : "text-white"
+							}`}
 					>
 						<svg
 								width="18"
@@ -164,7 +166,7 @@ export default function SearchToggle() {
 				{/* نتایج زنده */}
 				{showPanel && (
 						<div
-								className="absolute end-0 top-full z-30 mt-2 w-[min(20rem,calc(100vw-2rem))] overflow-hidden rounded-2xl border border-sky-100 bg-white p-1.5 shadow-[0_16px_40px_-12px_rgba(14,165,233,0.5)]">
+								className="absolute end-0 top-full z-30 mt-2 w-[min(20rem,calc(100vw-2rem))] overflow-hidden rounded-2xl border border-sky-100 bg-white p-1.5 shadow-[0_16px_40px_-12px_rgba(2,132,199,0.55)]">
 							{isFetching && !hits.length ? (
 									<p className="px-3 py-3 text-sm text-sky-700/70">در حال جست‌وجو…</p>
 							) : hits.length === 0 ? (
@@ -181,7 +183,7 @@ export default function SearchToggle() {
 																onClick={() => openHit(c)}
 																className={`flex w-full flex-col items-start gap-0.5 rounded-xl px-3 py-2 text-start transition duration-200 ${
 																		i === active
-																				? "bg-sky-50 shadow-[inset_0_0_0_1px_rgba(125,211,252,0.6)]"
+																				? "bg-sky-50 shadow-[inset_0_0_0_1px_rgba(125,211,252,0.7)]"
 																				: "hover:bg-sky-50"
 																}`}
 														>
