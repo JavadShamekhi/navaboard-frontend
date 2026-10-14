@@ -10,8 +10,8 @@ export default function NotificationBell() {
 					aria-label={count ? `اعلان‌ها (${count} خوانده‌نشده)` : "اعلان‌ها"}
 					title="اعلان‌ها"
 					className={({isActive}) =>
-							`group relative grid h-9 w-9 place-items-center rounded-full text-sky-900 transition duration-300 hover:-translate-y-px hover:bg-white hover:shadow-[0_0_18px_rgba(255,255,255,0.95)] active:scale-95 ${
-									isActive ? "bg-white shadow-sm" : "bg-white/40"
+							`group relative grid h-9 w-9 place-items-center rounded-full outline-none transition duration-300 hover:-translate-y-px hover:bg-white hover:text-sky-700 hover:shadow-[0_0_18px_rgba(255,255,255,0.6)] focus-visible:ring-2 focus-visible:ring-white active:scale-95 ${
+									isActive ? "bg-white text-sky-700 shadow-sm" : "bg-white/20 text-white"
 							}`
 					}
 			>
@@ -32,7 +32,7 @@ export default function NotificationBell() {
 				{count > 0 && (
 						<span
 								data-testid="unread-badge"
-								className="absolute -end-1 -top-1 min-w-4 rounded-full bg-rose px-1 text-center text-[10px] leading-4 text-white shadow-[0_0_0_2px_rgba(255,255,255,0.9)]"
+								className="absolute -end-1 -top-1 min-w-4 rounded-full bg-rose px-1 text-center text-[10px] leading-4 text-white shadow-[0_0_0_2px_rgb(14,165,233)]"
 						>
           {count > 99 ? "99+" : count}
         </span>
