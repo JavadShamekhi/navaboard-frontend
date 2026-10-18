@@ -143,7 +143,7 @@ export default function SearchToggle() {
 							onClick={toggle}
 							aria-label={open ? "بستن جست‌وجو" : "باز کردن جست‌وجو"}
 							title="جست‌وجو"
-							className={`group grid h-9 w-9 shrink-0 place-items-center rounded-full outline-none transition duration-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-300 active:scale-95 ${
+							className={`group grid h-9 w-9 shrink-0 place-items-center rounded-full hover:bg-white hover:text-sky-700 hover:shadow-[0_0_18px_rgba(255,255,255,0.6)] outline-none transition duration-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-300 active:scale-95 ${
 									open ? "text-sky-700" : "text-white"
 							}`}
 					>
